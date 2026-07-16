@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(where python *)",
+      "Bash(where npx *)",
+      "Bash(mkdir -p \"C:/Users/Usuario/Claude/Projects/chef_online/.claude\")"
+    ]
+  }
+}

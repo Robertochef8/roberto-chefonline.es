@@ -1,0 +1,18 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "chef_online_v2",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "-l", "5173", "prototipo_html"],
+      "port": 5173
+    },
+    {
+      "name": "app_web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--", "-p", "3000"],
+      "port": 3000,
+      "cwd": "app_web"
+    }
+  ]
+}
