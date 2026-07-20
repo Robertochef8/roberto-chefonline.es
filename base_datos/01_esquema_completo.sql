@@ -8,7 +8,7 @@ create extension if not exists pgcrypto;
 -- ============================================================
 -- 0) AUTENTICACIÓN Y MULTI-TENANT
 -- ============================================================
-create table restaurantes (
+create table if not exists restaurantes (
   id             uuid primary key default gen_random_uuid(),
   nombre         text not null,
   lugar          text,                 -- población / comarca, ej. "Guía de Isora, Tenerife"
@@ -19,7 +19,7 @@ create table restaurantes (
 );
 
 -- Relación usuario de Supabase Auth ⇄ restaurante(s) a los que tiene acceso
-create table usuarios_restaurante (
+create table if not exists usuarios_restaurante (
   id             uuid primary key default gen_random_uuid(),
   user_id        uuid not null references auth.users(id) on delete cascade,
   restaurante_id uuid not null references restaurantes(id) on delete cascade,
@@ -28,7 +28,7 @@ create table usuarios_restaurante (
   unique (user_id, restaurante_id)
 );
 
-create index idx_usuarios_restaurante_user on usuarios_restaurante(user_id);
+create index if not exists idx_usuarios_restaurante_user on usuarios_restaurante(user_id);
 
 -- Helper para las políticas RLS: restaurantes a los que pertenece el usuario autenticado
 create or replace function mis_restaurantes()
@@ -39,7 +39,7 @@ $$;
 -- ============================================================
 -- 1) CATEGORÍAS DE CARTA (Entrante/Principal/Postre/Bebida... personalizable por restaurante)
 -- ============================================================
-create table categorias_carta (
+create table if not exists categorias_carta (
   id             uuid primary key default gen_random_uuid(),
   restaurante_id uuid not null references restaurantes(id) on delete cascade,
   nombre         text not null,
@@ -50,7 +50,7 @@ create table categorias_carta (
 -- ============================================================
 -- 2) ALÉRGENOS (catálogo fijo UE 1169/2011 — global, no depende de restaurante)
 -- ============================================================
-create table alergenos (
+create table if not exists alergenos (
   id      smallint primary key,
   codigo  text not null unique,     -- 'gluten', 'crustaceos', ...
   nombre  text not null             -- 'Cereales con gluten', 'Crustáceos', ...
@@ -67,7 +67,7 @@ on conflict (id) do nothing;
 -- ============================================================
 -- 3) PROVEEDORES (directorio de empresas)
 -- ============================================================
-create table proveedores (
+create table if not exists proveedores (
   id                uuid primary key default gen_random_uuid(),
   restaurante_id    uuid not null references restaurantes(id) on delete cascade,
   cif_nif           text,
@@ -86,13 +86,13 @@ create table proveedores (
   actualizado_en    timestamptz default now()
 );
 
-create index idx_proveedores_restaurante on proveedores(restaurante_id);
-create unique index uq_proveedores_cif on proveedores(restaurante_id, cif_nif) where cif_nif is not null and cif_nif <> '';
+create index if not exists idx_proveedores_restaurante on proveedores(restaurante_id);
+create unique index if not exists uq_proveedores_cif on proveedores(restaurante_id, cif_nif) where cif_nif is not null and cif_nif <> '';
 
 -- ============================================================
 -- 4) INGREDIENTES (catálogo maestro del restaurante)
 -- ============================================================
-create table ingredientes (
+create table if not exists ingredientes (
   id                    uuid primary key default gen_random_uuid(),
   restaurante_id        uuid not null references restaurantes(id) on delete cascade,
   codigo                text not null,             -- ING-00001, autogenerado
@@ -107,8 +107,8 @@ create table ingredientes (
   unique (restaurante_id, codigo)
 );
 
-create index idx_ingredientes_restaurante on ingredientes(restaurante_id);
-create index idx_ingredientes_nombre on ingredientes(restaurante_id, lower(nombre));
+create index if not exists idx_ingredientes_restaurante on ingredientes(restaurante_id);
+create index if not exists idx_ingredientes_nombre on ingredientes(restaurante_id, lower(nombre));
 
 create or replace function siguiente_codigo_ingrediente(p_restaurante_id uuid)
 returns text language plpgsql as $$
@@ -121,7 +121,7 @@ end; $$;
 
 -- Alérgenos declarados por ingrediente (solo se guardan estados relevantes;
 -- la ausencia de fila equivale a "No contiene")
-create table ingrediente_alergeno (
+create table if not exists ingrediente_alergeno (
   ingrediente_id uuid not null references ingredientes(id) on delete cascade,
   alergeno_id    smallint not null references alergenos(id),
   estado         text not null check (estado in ('contiene','trazas','pendiente')),
@@ -131,7 +131,7 @@ create table ingrediente_alergeno (
 -- ============================================================
 -- 5) INGREDIENTE ⇄ PROVEEDOR (precio propio de cada proveedor)
 -- ============================================================
-create table ingrediente_proveedor (
+create table if not exists ingrediente_proveedor (
   id                   uuid primary key default gen_random_uuid(),
   ingrediente_id       uuid not null references ingredientes(id) on delete cascade,
   proveedor_id         uuid not null references proveedores(id) on delete cascade,
@@ -141,13 +141,13 @@ create table ingrediente_proveedor (
   unique (ingrediente_id, proveedor_id)
 );
 
-create index idx_ingprov_ingrediente on ingrediente_proveedor(ingrediente_id);
-create index idx_ingprov_proveedor on ingrediente_proveedor(proveedor_id);
+create index if not exists idx_ingprov_ingrediente on ingrediente_proveedor(ingrediente_id);
+create index if not exists idx_ingprov_proveedor on ingrediente_proveedor(proveedor_id);
 
 -- ============================================================
 -- 6) HISTÓRICO DE PRECIOS (auditoría)
 -- ============================================================
-create table historial_precios_ingrediente (
+create table if not exists historial_precios_ingrediente (
   id              uuid primary key default gen_random_uuid(),
   ingrediente_id  uuid not null references ingredientes(id) on delete cascade,
   proveedor_id    uuid references proveedores(id) on delete set null,
@@ -157,12 +157,12 @@ create table historial_precios_ingrediente (
   origen          text not null default 'manual' check (origen in ('manual','importacion_csv'))
 );
 
-create index idx_historial_ingrediente on historial_precios_ingrediente(ingrediente_id, fecha desc);
+create index if not exists idx_historial_ingrediente on historial_precios_ingrediente(ingrediente_id, fecha desc);
 
 -- ============================================================
 -- 7) MAPEO DE COLUMNAS GUARDADO POR PROVEEDOR (importación CSV/XLS/TXT)
 -- ============================================================
-create table proveedor_import_mapping (
+create table if not exists proveedor_import_mapping (
   id                   uuid primary key default gen_random_uuid(),
   proveedor_id         uuid not null references proveedores(id) on delete cascade,
   columna_nombre       int,
@@ -179,7 +179,7 @@ create table proveedor_import_mapping (
 -- ============================================================
 -- 8) PLATOS (recetas de la carta)
 -- ============================================================
-create table platos (
+create table if not exists platos (
   id                   uuid primary key default gen_random_uuid(),
   restaurante_id       uuid not null references restaurantes(id) on delete cascade,
   codigo               text not null,              -- PL-00001, autogenerado
@@ -201,7 +201,7 @@ create table platos (
   unique (restaurante_id, codigo)
 );
 
-create index idx_platos_restaurante on platos(restaurante_id);
+create index if not exists idx_platos_restaurante on platos(restaurante_id);
 
 create or replace function siguiente_codigo_plato(p_restaurante_id uuid)
 returns text language plpgsql as $$
@@ -213,7 +213,7 @@ begin
 end; $$;
 
 -- Líneas del escandallo: qué ingredientes y cuánta cantidad lleva cada plato
-create table plato_ingrediente (
+create table if not exists plato_ingrediente (
   id             uuid primary key default gen_random_uuid(),
   plato_id       uuid not null references platos(id) on delete cascade,
   ingrediente_id uuid not null references ingredientes(id) on delete restrict,
@@ -222,8 +222,8 @@ create table plato_ingrediente (
   unique (plato_id, ingrediente_id)
 );
 
-create index idx_platoing_plato on plato_ingrediente(plato_id);
-create index idx_platoing_ingrediente on plato_ingrediente(ingrediente_id);
+create index if not exists idx_platoing_plato on plato_ingrediente(plato_id);
+create index if not exists idx_platoing_ingrediente on plato_ingrediente(ingrediente_id);
 
 -- ============================================================
 -- 9) CÁLCULO DE FOOD COST (función reutilizable por API/Dashboard/Informes)
@@ -295,22 +295,54 @@ alter table proveedor_import_mapping enable row level security;
 alter table platos enable row level security;
 alter table plato_ingrediente enable row level security;
 
-create policy "acceso restaurante propio" on restaurantes for all using (id in (select mis_restaurantes()));
-create policy "acceso membresias propias" on usuarios_restaurante for select using (user_id = auth.uid());
-create policy "acceso por restaurante" on categorias_carta for all using (restaurante_id in (select mis_restaurantes()));
-create policy "acceso por restaurante" on proveedores for all using (restaurante_id in (select mis_restaurantes()));
-create policy "acceso por restaurante" on ingredientes for all using (restaurante_id in (select mis_restaurantes()));
-create policy "acceso por restaurante" on platos for all using (restaurante_id in (select mis_restaurantes()));
-create policy "acceso via ingrediente" on ingrediente_alergeno for all using (
-  ingrediente_id in (select id from ingredientes where restaurante_id in (select mis_restaurantes())));
-create policy "acceso via ingrediente" on ingrediente_proveedor for all using (
-  ingrediente_id in (select id from ingredientes where restaurante_id in (select mis_restaurantes())));
-create policy "acceso via ingrediente" on historial_precios_ingrediente for all using (
-  ingrediente_id in (select id from ingredientes where restaurante_id in (select mis_restaurantes())));
-create policy "acceso via proveedor" on proveedor_import_mapping for all using (
-  proveedor_id in (select id from proveedores where restaurante_id in (select mis_restaurantes())));
-create policy "acceso via plato" on plato_ingrediente for all using (
-  plato_id in (select id from platos where restaurante_id in (select mis_restaurantes())));
+do $$ begin
+  create policy "acceso restaurante propio" on restaurantes for all using (id in (select mis_restaurantes()));
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create policy "acceso membresias propias" on usuarios_restaurante for select using (user_id = auth.uid());
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create policy "acceso por restaurante" on categorias_carta for all using (restaurante_id in (select mis_restaurantes()));
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create policy "acceso por restaurante" on proveedores for all using (restaurante_id in (select mis_restaurantes()));
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create policy "acceso por restaurante" on ingredientes for all using (restaurante_id in (select mis_restaurantes()));
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create policy "acceso por restaurante" on platos for all using (restaurante_id in (select mis_restaurantes()));
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create policy "acceso via ingrediente" on ingrediente_alergeno for all using (
+    ingrediente_id in (select id from ingredientes where restaurante_id in (select mis_restaurantes())));
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create policy "acceso via ingrediente" on ingrediente_proveedor for all using (
+    ingrediente_id in (select id from ingredientes where restaurante_id in (select mis_restaurantes())));
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create policy "acceso via ingrediente" on historial_precios_ingrediente for all using (
+    ingrediente_id in (select id from ingredientes where restaurante_id in (select mis_restaurantes())));
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create policy "acceso via proveedor" on proveedor_import_mapping for all using (
+    proveedor_id in (select id from proveedores where restaurante_id in (select mis_restaurantes())));
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create policy "acceso via plato" on plato_ingrediente for all using (
+    plato_id in (select id from platos where restaurante_id in (select mis_restaurantes())));
+exception when duplicate_object then null; end $$;
 
 -- ============================================================
 -- NOTAS DE DISEÑO
