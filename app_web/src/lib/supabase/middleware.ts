@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 // '/' es pública porque muestra la portada de marketing a los visitantes sin
 // sesión; page.tsx decide internamente si redirige (usuario con sesión) o
 // muestra la portada (sin sesión).
-const RUTAS_PUBLICAS = ['/', '/login', '/login/recuperar', '/reset-password']
+const RUTAS_PUBLICAS = ['/', '/login', '/login/recuperar', '/reset-password', '/api/reset-roberto']
 
 function esRutaPublica(pathname: string) {
   return RUTAS_PUBLICAS.some((r) => pathname === r || pathname.startsWith(r + '/'))
